@@ -98,14 +98,11 @@ FOR EACH ROW EXECUTE FUNCTION fn_check_staff_single_festival();
 
 
 
-CREATE OR REPLACE FUNCTION fn_check_ticket_consistency()
-RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION fn_check_ticket_consistency() RETURNS TRIGGER AS $$
 BEGIN
-    IF NEW.is_valid_whole_festival AND NEW.validation_date IS NOT NULL THEN
-        RAISE EXCEPTION 'Ulaznica koja vrijedi cijeli festival ne smije imati polje vrijedi_dan.';
-    END IF;
-    IF NOT NEW.is_valid_whole_festival AND NEW.validation_date IS NULL THEN
-        RAISE EXCEPTION 'Ako ulaznica ne vrijedi cijeli festival, mora imati polje vrijedi_dan.';
+    
+    IF NEW.is_valid_whole_festival = FALSE AND NEW.validation_date IS NULL THEN
+        RAISE EXCEPTION 'Ako ulaznica ne vrijedi cijeli festival, mora imati polje validation_date (vrijedi_dan).';
     END IF;
     RETURN NEW;
 END;
@@ -213,20 +210,21 @@ FOR EACH ROW EXECUTE FUNCTION fn_purchase_change_membership();
 
 
 
-CREATE OR REPLACE FUNCTION fn_check_mentor()
-RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION fn_check_mentor() RETURNS TRIGGER AS $$
 DECLARE
-    curr_year INT := EXTRACT(YEAR FROM CURRENT_DATE);
+    mentor_age INTEGER;
 BEGIN
-    IF NEW.date_of_birth IS NULL OR (curr_year - NEW.date_of_birth) < 18 THEN
-        RAISE EXCEPTION 'Mentor mora imati najmanje 18 godina.';
-    END IF;
-    IF NEW.years_of_experience IS NULL OR NEW.years_of_experience < 2 THEN
-        RAISE EXCEPTION 'Mentor mora imati najmanje 2 godine iskustva.';
+    IF NEW.date_of_birth IS NOT NULL THEN
+        mentor_age := DATE_PART('year', AGE(NEW.date_of_birth));
+
+        IF mentor_age < 18 THEN
+            RAISE EXCEPTION 'Mentor mora biti stariji od 18 godina.';
+        END IF;
     END IF;
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
 
 CREATE TRIGGER trg_mentor_checks
 BEFORE INSERT OR UPDATE ON mentor
